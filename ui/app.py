@@ -1,116 +1,63 @@
-"""
-ЭТАП 5 — Streamlit UI for sentiment classification.
-
-Sends HTTP requests to the ClearML Serving endpoint.
-Does NOT load any model directly.
-
-Usage:
-    streamlit run ui/app.py
-
-Set the endpoint URL via the sidebar or the env variable:
-    SERVING_URL=http://localhost:8080/serve/sentiment
-"""
-
 import os
 import time
-
 import requests
 import streamlit as st
 
-# ── Page config ───────────────────────────────────────────────────────────────
-st.set_page_config(
-    page_title="Sentiment Classifier",
-    page_icon="💬",
-    layout="centered",
-)
+st.set_page_config(page_title="Sentiment Classifier", page_icon="💬", layout="centered")
 
-# ── Sidebar — endpoint configuration ─────────────────────────────────────────
 with st.sidebar:
     st.header("Settings")
-    default_url = os.getenv(
-        "SERVING_URL", "http://localhost:8080/serve/sentiment"
+    url = st.text_input(
+        "Endpoint URL",
+        value=os.getenv("SERVING_URL", "http://localhost:8082/serve/sentiment"),
     )
-    endpoint_url = st.text_input("Serving endpoint URL", value=default_url)
-    timeout_sec = st.slider("Request timeout (s)", min_value=1, max_value=30, value=10)
-    st.markdown("---")
-    st.caption(
-        "The model is hosted by **ClearML Serving** and loaded from the "
-        "Model Registry. This UI communicates with it over HTTP."
-    )
+    timeout = st.slider("Timeout (s)", 1, 30, 10)
+    st.caption("Model is hosted via ClearML Serving and loaded from Model Registry.")
 
-# ── Main UI ───────────────────────────────────────────────────────────────────
 st.title("💬 Sentiment Classifier")
-st.write("Enter a movie review (or any text) and click **Predict** to classify it.")
+st.write("Enter a movie review and click **Predict**.")
 
-text_input = st.text_area(
-    label="Input text",
-    placeholder="Type or paste your text here...",
-    height=150,
-)
+text = st.text_area("Text", placeholder="Paste your review here...", height=150)
+btn = st.button("Predict", type="primary", use_container_width=True)
 
-predict_clicked = st.button("Predict", type="primary", use_container_width=True)
-
-if predict_clicked:
-    if not text_input.strip():
-        st.warning("Please enter some text before predicting.")
-    elif not endpoint_url.strip():
-        st.error("Endpoint URL is empty — configure it in the sidebar.")
+if btn:
+    if not text.strip():
+        st.warning("Enter some text first.")
+    elif not url.strip():
+        st.error("Set the endpoint URL in the sidebar.")
     else:
-        with st.spinner("Sending request to serving endpoint..."):
-            start = time.perf_counter()
+        with st.spinner("Sending request..."):
+            t0 = time.perf_counter()
             try:
-                response = requests.post(
-                    endpoint_url,
-                    json={"text": text_input},
-                    timeout=timeout_sec,
-                )
-                latency_ms = (time.perf_counter() - start) * 1000
-                response.raise_for_status()
-                result = response.json()
-
+                resp = requests.post(url, json={"text": text}, timeout=timeout)
+                latency = (time.perf_counter() - t0) * 1000
+                resp.raise_for_status()
+                result = resp.json()
             except requests.exceptions.ConnectionError:
-                st.error(
-                    "Could not connect to the serving endpoint. "
-                    "Make sure `clearml-serving` is running and the URL is correct."
-                )
+                st.error("Can't reach the endpoint. Is clearml-serving running?")
                 st.stop()
             except requests.exceptions.Timeout:
-                st.error(
-                    f"Request timed out after {timeout_sec} s. "
-                    "Try increasing the timeout in the sidebar."
-                )
+                st.error(f"Timed out after {timeout}s.")
                 st.stop()
-            except requests.exceptions.HTTPError as exc:
-                st.error(f"Endpoint returned an error: {exc}")
-                st.stop()
-            except Exception as exc:
-                st.error(f"Unexpected error: {exc}")
+            except Exception as e:
+                st.error(str(e))
                 st.stop()
 
-        # ── Display results ───────────────────────────────────────────────────
-        label = result.get("label", "unknown")
-        label_id = result.get("label_id", -1)
-
-        is_positive = label_id == 1
-        emoji = "✅ Positive" if is_positive else "❌ Negative"
-        color = "green" if is_positive else "red"
+        label = result.get("label", "?")
+        is_pos = result.get("label_id") == 1
 
         st.markdown("---")
         col1, col2 = st.columns(2)
-        with col1:
-            st.metric(label="Sentiment", value=emoji)
-        with col2:
-            st.metric(label="Latency", value=f"{latency_ms:.1f} ms")
+        col1.metric("Sentiment", "✅ Positive" if is_pos else "❌ Negative")
+        col2.metric("Latency", f"{latency:.1f} ms")
 
+        color = "green" if is_pos else "red"
         st.markdown(
-            f"<p style='color:{color}; font-size:18px; font-weight:bold;'>"
-            f"Prediction: <strong>{label.upper()}</strong></p>",
+            f"<p style='color:{color};font-size:18px'><b>{label.upper()}</b></p>",
             unsafe_allow_html=True,
         )
-
         with st.expander("Raw response"):
             st.json(result)
 
-# ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
-st.caption("MLOps Spring 2026 · ClearML · TF-IDF + Logistic Regression")
+st.caption("MLOps Spring 2026 · ClearML · TF-IDF + LogReg")

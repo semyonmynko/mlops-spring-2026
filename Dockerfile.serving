@@ -1,0 +1,18 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir \
+    clearml \
+    clearml-serving \
+    fastapi \
+    uvicorn \
+    grpcio \
+    scikit-learn \
+    joblib
+
+COPY serving/ serving/
+
+EXPOSE 8082
+
+CMD ["uvicorn", "clearml_serving.serving.main:app", "--host", "0.0.0.0", "--port", "8082"]
