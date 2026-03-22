@@ -44,6 +44,7 @@ reg_task = Task.init(
     task_name="Register sentiment-classifier v1.0",
     task_type=Task.TaskTypes.training,
     reuse_last_task_id=False,
+    output_uri=True,
 )
 
 model = OutputModel(
