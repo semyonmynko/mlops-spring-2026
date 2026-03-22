@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.DS_Store
+data/raw/
+*.pkl
+*.joblib
+.env
+clearml.conf
