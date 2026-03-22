@@ -84,8 +84,21 @@ else:
     )
 
 local_path = ds.get_local_copy()
-train_df = pd.read_csv(os.path.join(local_path, "train.csv"))
-test_df = pd.read_csv(os.path.join(local_path, "test.csv"))
+
+
+def _find_csv(base: str, name: str) -> str:
+    """Return path to CSV, handling ClearML's extra nesting (name/name)."""
+    direct = os.path.join(base, name)
+    if os.path.isfile(direct):
+        return direct
+    nested = os.path.join(base, name, name)
+    if os.path.isfile(nested):
+        return nested
+    raise FileNotFoundError(f"Cannot find {name} under {base}")
+
+
+train_df = pd.read_csv(_find_csv(local_path, "train.csv"))
+test_df = pd.read_csv(_find_csv(local_path, "test.csv"))
 
 print(f"Train size: {len(train_df)}, Test size: {len(test_df)}")
 
